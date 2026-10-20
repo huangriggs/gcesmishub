@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>教學資源導航 Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SortableJS 拖曳庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans TC', sans-serif; }
+    .sortable-ghost { opacity: 0.35; transform: scale(0.98); }
+    .sortable-chosen { box-shadow: 0 14px 28px rgba(0,0,0,0.12); }
+  </style>
+</head>
+<body class="bg-[#F8F9FA] text-[#202124] min-h-screen flex flex-col">
+
+  <!-- 頂部 Google 四原色條與導航列 -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+    <div class="h-1.5 w-full flex">
+      <div class="h-full w-1/4 bg-[#4285F4]"></div>
+      <div class="h-full w-1/4 bg-[#EA4335]"></div>
+      <div class="h-full w-1/4 bg-[#FBBC05]"></div>
+      <div class="h-full w-1/4 bg-[#34A853]"></div>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <span class="text-2xl">📚</span>
+        <h1 class="text-xl font-bold tracking-tight text-gray-800">教學資源導航 Hub</h1>
+      </div>
+
+      <!-- 右側管理按鈕區 -->
+      <div class="flex items-center space-x-2.5">
+        <div id="adminBadge" class="hidden items-center space-x-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-full font-medium">
+          <span class="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span>管理員模式</span>
+        </div>
+
+        <button id="saveOrderBtn" onclick="saveOrder()" class="hidden bg-[#34A853] hover:bg-green-700 text-white text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg shadow-sm transition">
+          💾 儲存排版
+        </button>
+
+        <button id="manageCatBtn" onclick="openCatModal()" class="hidden bg-gray-800 hover:bg-black text-white text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg shadow-sm transition">
+          🏷️ 管理類別
+        </button>
+
+        <button id="addSiteBtn" onclick="openModal('add')" class="hidden bg-[#4285F4] hover:bg-blue-600 text-white text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg shadow-sm transition">
+          + 新增網站
+        </button>
+
+        <button id="authBtn" onclick="toggleAuthModal()" class="text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition">
+          管理員登入
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容區 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+    
+    <!-- 篩選與搜尋列 -->
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+      <div class="relative w-full sm:w-80">
+        <input type="text" id="searchInput" oninput="renderCards()" placeholder="搜尋網站名稱或描述..." 
+               class="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
+        <span class="absolute left-3 top-2.5 text-gray-400 text-sm">🔍</span>
+      </div>
+
+      <!-- 動態類別按鈕列 -->
+      <div id="categoryFilterBar" class="flex items-center space-x-2 overflow-x-auto w-full sm:w-auto pb-1"></div>
+    </div>
+
+    <!-- 載入中動畫 -->
+    <div id="loading" class="text-center py-20 text-gray-400">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#4285F4] border-t-transparent"></div>
+      <p class="mt-3 text-sm">正在從雲端載入資源清單...</p>
+    </div>
+
+    <!-- 卡片網格容器 -->
+    <div id="gridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+  </main>
+
+  <!-- 密碼登入 Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
+      <h3 class="text-base font-bold text-gray-800 mb-1">管理員登入</h3>
+      <p class="text-xs text-gray-500 mb-4">輸入密碼解鎖增修、分類與排版挪移功能。</p>
+      <input type="password" id="passwordInput" placeholder="請輸入管理密碼" 
+             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
+      <div class="flex justify-end space-x-2">
+        <button onclick="toggleAuthModal()" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+        <button onclick="verifyPassword()" class="px-4 py-2 text-xs font-medium text-white bg-[#4285F4] hover:bg-blue-600 rounded-lg">確認登入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 網站 新增 / 編輯 Modal -->
+  <div id="editModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+      <h3 id="modalTitle" class="text-base font-bold text-gray-800 mb-4">新增教學資源</h3>
+      <input type="hidden" id="editSiteId">
+      <div class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">網站名稱</label>
+          <input type="text" id="siteTitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">網站網址 (URL)</label>
+          <input type="url" id="siteUrl" placeholder="https://..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">主題分類</label>
+          <select id="siteCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4285F4]"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">簡短介紹</label>
+          <textarea id="siteDesc" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4285F4]"></textarea>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2 mt-6">
+        <button onclick="closeModal()" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+        <button onclick="submitSiteForm()" class="px-4 py-2 text-xs font-medium text-white bg-[#4285F4] hover:bg-blue-600 rounded-lg">儲存並寫入雲端</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 類別管理 Modal -->
+  <div id="catModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-base font-bold text-gray-800">🏷️ 教學分類管理</h3>
+        <button onclick="closeCatModal()" class="text-gray-400 hover:text-gray-600">✕</button>
+      </div>
+
+      <div class="bg-gray-50 p-3.5 rounded-lg border border-gray-200 mb-4">
+        <div class="text-xs font-bold text-gray-700 mb-2">新增類別</div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input type="text" id="newCatName" placeholder="類別名稱" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-gray-800">
+          <select id="newCatColor" class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs">
+            <option value="blue">🔵 Google 藍</option>
+            <option value="red">🔴 Google 紅</option>
+            <option value="yellow">🟡 Google 黃</option>
+            <option value="green">🟢 Google 綠</option>
+          </select>
+          <button onclick="submitNewCategory()" class="bg-gray-900 hover:bg-black text-white text-xs font-medium rounded-lg px-3 py-1.5 transition">
+            + 建立類別
+          </button>
+        </div>
+      </div>
+
+      <div class="text-xs font-bold text-gray-700 mb-2">現有類別列表</div>
+      <div id="catListContainer" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+
+      <div class="flex justify-end mt-4">
+        <button onclick="closeCatModal()" class="px-4 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // ⚠️ 請務必將此網址替換為您的 GAS Web 應用程式網址！
+    // ============================================================
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzq7wiG_q6cDXFQm0Fai2CCkhzSN5YvxHNVVj2SSVroZrWeWIqrFIiBh4pvTcbEtv8/exec";
+
+    let siteList = [];
+    let categoryList = [];
+    let currentFilter = "all";
+    let adminToken = sessionStorage.getItem("adminPassword") || "";
+    let sortableInstance = null;
+
+    const colorStyles = {
+      blue: { border: "border-t-[#4285F4]", badgeBg: "bg-blue-50", badgeText: "text-[#4285F4]", dot: "bg-[#4285F4]" },
+      red: { border: "border-t-[#EA4335]", badgeBg: "bg-red-50", badgeText: "text-[#EA4335]", dot: "bg-[#EA4335]" },
+      yellow: { border: "border-t-[#FBBC05]", badgeBg: "bg-amber-50", badgeText: "text-[#D97706]", dot: "bg-[#FBBC05]" },
+      green: { border: "border-t-[#34A853]", badgeBg: "bg-green-50", badgeText: "text-[#34A853]", dot: "bg-[#34A853]" }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      updateAdminUI();
+      loadAllData();
+    });
+
+    // 1. fetch 抓取雲端資料
+    async function loadAllData() {
+      document.getElementById("loading").classList.remove("hidden");
+      try {
+        const res = await fetch(GAS_API_URL);
+        const data = await res.json();
+        if (data.status === "success") {
+          siteList = data.sites || [];
+          categoryList = data.categories || [];
+          renderCategoryFilter();
+          renderCards();
+        } else {
+          alert("讀取失敗：" + data.message);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("無法連線至 GAS 後端，請檢查 GAS 部署權限是否設為「所有人」。");
+      } finally {
+        document.getElementById("loading").classList.add("hidden");
+      }
+    }
+
+    // 2. 類別渲染
+    function renderCategoryFilter() {
+      const bar = document.getElementById("categoryFilterBar");
+      bar.innerHTML = "";
+
+      const allBtn = document.createElement("button");
+      allBtn.className = `filter-tab px-3.5 py-1.5 rounded-full text-xs font-medium transition ${currentFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400'}`;
+      allBtn.textContent = "全部";
+      allBtn.onclick = () => setFilter("all");
+      bar.appendChild(allBtn);
+
+      categoryList.forEach(cat => {
+        const style = colorStyles[cat.colorKey] || colorStyles.blue;
+        const btn = document.createElement("button");
+        const isActive = currentFilter === cat.name;
+        btn.className = `filter-tab px-3 py-1.5 rounded-full text-xs font-medium transition flex items-center space-x-1.5 ${isActive ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400'}`;
+        btn.innerHTML = `<span class="w-2 h-2 rounded-full ${style.dot}"></span><span>${cat.name}</span>`;
+        btn.onclick = () => setFilter(cat.name);
+        bar.appendChild(btn);
+      });
+
+      const select = document.getElementById("siteCategory");
+      select.innerHTML = "";
+      categoryList.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat.name;
+        opt.textContent = `${cat.name} (${cat.colorKey})`;
+        select.appendChild(opt);
+      });
+    }
+
+    // 3. 卡片渲染（含 Google Favicon 自動提取）
+    function renderCards() {
+      const container = document.getElementById("gridContainer");
+      container.innerHTML = "";
+      const search = document.getElementById("searchInput").value.toLowerCase().trim();
+
+      const filtered = siteList.filter(item => {
+        const matchFilter = currentFilter === "all" || item.category === currentFilter;
+        const matchSearch = String(item.title).toLowerCase().includes(search) || 
+                            String(item.description).toLowerCase().includes(search);
+        return matchFilter && matchSearch;
+      });
+
+      filtered.forEach(item => {
+        const matchedCat = categoryList.find(c => c.name === item.category);
+        const colorKey = matchedCat ? matchedCat.colorKey : "blue";
+        const theme = colorStyles[colorKey] || colorStyles.blue;
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(item.url)}&sz=64`;
+
+        const card = document.createElement("div");
+        card.setAttribute("data-id", item.id);
+        card.className = `bg-white rounded-xl border border-gray-200 border-t-4 ${theme.border} p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between relative group ${adminToken ? 'cursor-grab active:cursor-grabbing' : ''}`;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start mb-2.5">
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${theme.badgeBg} ${theme.badgeText}">
+                ${item.category || '未分類'}
+              </span>
+              ${adminToken ? `
+                <div class="flex space-x-1.5 opacity-90">
+                  <button onclick="editSite('${item.id}', event)" class="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600 text-xs">✏️</button>
+                  <button onclick="deleteSite('${item.id}', event)" class="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-red-600 text-xs">🗑️</button>
+                </div>
+              ` : ''}
+            </div>
+            <div class="flex items-center space-x-2.5 mb-1.5">
+              <img src="${faviconUrl}" alt="" class="w-5 h-5 rounded-sm flex-shrink-0" onerror="this.style.display='none'">
+              <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-base font-bold text-gray-800 hover:text-[#4285F4] transition block truncate">
+                ${item.title} ↗
+              </a>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed line-clamp-3">
+              ${item.description || '暫無簡述'}
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+            <span class="truncate max-w-[180px]">${item.url.replace(/^https?:\/\//, '')}</span>
+            <span class="text-gray-300">#${item.order || '-'}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      initSortable();
+    }
+
+    // 4. 拖曳排版
+    function initSortable() {
+      const container = document.getElementById("gridContainer");
+      if (sortableInstance) sortableInstance.destroy();
+
+      if (adminToken && currentFilter === "all" && !document.getElementById("searchInput").value) {
+        sortableInstance = new Sortable(container, {
+          animation: 180,
+          ghostClass: 'sortable-ghost',
+          chosenClass: 'sortable-chosen',
+          onEnd: function() {
+            document.getElementById("saveOrderBtn").classList.remove("hidden");
+          }
+        });
+      }
+    }
+
+    async function sendPost(action, extraPayload = {}) {
+      const res = await fetch(GAS_API_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: action,
+          password: adminToken,
+          ...extraPayload
+        })
+      });
+      return await res.json();
+    }
+
+    async function saveOrder() {
+      const cardElements = document.querySelectorAll("#gridContainer [data-id]");
+      const orders = [];
+      cardElements.forEach((el, index) => {
+        orders.push({ id: el.getAttribute("data-id"), order: index + 1 });
+      });
+
+      const btn = document.getElementById("saveOrderBtn");
+      btn.textContent = "儲存中...";
+      btn.disabled = true;
+
+      try {
+        const res = await sendPost("reorderSites", { orders: orders });
+        if (res.status === "success") {
+          alert(res.message);
+          btn.classList.add("hidden");
+          loadAllData();
+        } else {
+          alert("儲存失敗：" + res.message);
+        }
+      } catch (err) {
+        alert("網路錯誤，排版儲存失敗。");
+      } finally {
+        btn.textContent = "💾 儲存排版";
+        btn.disabled = false;
+      }
+    }
+
+    // 5. 類別管理
+    function openCatModal() {
+      renderCatList();
+      document.getElementById("catModal").classList.remove("hidden");
+    }
+
+    function closeCatModal() {
+      document.getElementById("catModal").classList.add("hidden");
+    }
+
+    function renderCatList() {
+      const container = document.getElementById("catListContainer");
+      container.innerHTML = "";
+      categoryList.forEach(cat => {
+        const style = colorStyles[cat.colorKey] || colorStyles.blue;
+        const div = document.createElement("div");
+        div.className = "flex items-center justify-between p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-xs";
+        div.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full ${style.dot}"></span>
+            <span class="font-medium text-gray-800">${cat.name}</span>
+            <span class="text-gray-400 text-[10px]">(${cat.colorKey})</span>
+          </div>
+          <button onclick="deleteCat('${cat.id}')" class="text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50">刪除</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function submitNewCategory() {
+      const name = document.getElementById("newCatName").value.trim();
+      const colorKey = document.getElementById("newCatColor").value;
+      if (!name) return alert("請輸入類別名稱！");
+
+      document.getElementById("loading").classList.remove("hidden");
+      try {
+        const res = await sendPost("addCategory", { name: name, colorKey: colorKey });
+        if (res.status === "success") {
+          alert(res.message);
+          document.getElementById("newCatName").value = "";
+          closeCatModal();
+          loadAllData();
+        } else {
+          alert(res.message);
+        }
+      } catch (err) {
+        alert("連線失敗！");
+      } finally {
+        document.getElementById("loading").classList.add("hidden");
+      }
+    }
+
+    async function deleteCat(catId) {
+      if (!confirm("確定要刪除此類別嗎？")) return;
+      document.getElementById("loading").classList.remove("hidden");
+      try {
+        const res = await sendPost("deleteCategory", { id: catId });
+        if (res.status === "success") {
+          alert(res.message);
+          closeCatModal();
+          loadAllData();
+        } else {
+          alert(res.message);
+        }
+      } catch (err) {
+        alert("刪除失敗！");
+      } finally {
+        document.getElementById("loading").classList.add("hidden");
+      }
+    }
+
+    // 6. 登入切換
+    function toggleAuthModal() {
+      if (adminToken) {
+        if (confirm("是否登出管理員身分？")) {
+          adminToken = "";
+          sessionStorage.removeItem("adminPassword");
+          updateAdminUI();
+          renderCards();
+        }
+      } else {
+        document.getElementById("loginModal").classList.toggle("hidden");
+      }
+    }
+
+    function verifyPassword() {
+      const pwd = document.getElementById("passwordInput").value.trim();
+      if (!pwd) return alert("請輸入密碼！");
+      adminToken = pwd;
+      sessionStorage.setItem("adminPassword", pwd);
+      document.getElementById("loginModal").classList.add("hidden");
+      document.getElementById("passwordInput").value = "";
+      updateAdminUI();
+      renderCards();
+    }
+
+    function updateAdminUI() {
+      const badge = document.getElementById("adminBadge");
+      const addBtn = document.getElementById("addSiteBtn");
+      const manageCatBtn = document.getElementById("manageCatBtn");
+      const authBtn = document.getElementById("authBtn");
+
+      if (adminToken) {
+        badge.classList.remove("hidden");
+        addBtn.classList.remove("hidden");
+        manageCatBtn.classList.remove("hidden");
+        authBtn.textContent = "登出管理";
+        authBtn.classList.add("text-red-600");
+      } else {
+        badge.classList.add("hidden");
+        addBtn.classList.add("hidden");
+        manageCatBtn.classList.add("hidden");
+        document.getElementById("saveOrderBtn").classList.add("hidden");
+        authBtn.textContent = "管理員登入";
+        authBtn.classList.remove("text-red-600");
+      }
+    }
+
+    // 7. 網站增修刪
+    function openModal(mode) {
+      document.getElementById("editModal").classList.remove("hidden");
+      if (mode === "add") {
+        document.getElementById("modalTitle").textContent = "新增教學資源";
+        document.getElementById("editSiteId").value = "";
+        document.getElementById("siteTitle").value = "";
+        document.getElementById("siteUrl").value = "";
+        document.getElementById("siteDesc").value = "";
+      }
+    }
+
+    function closeModal() {
+      document.getElementById("editModal").classList.add("hidden");
+    }
+
+    function editSite(id, event) {
+      event.stopPropagation();
+      const item = siteList.find(s => String(s.id) === String(id));
+      if (!item) return;
+
+      document.getElementById("modalTitle").textContent = "編輯教學資源";
+      document.getElementById("editSiteId").value = item.id;
+      document.getElementById("siteTitle").value = item.title;
+      document.getElementById("siteUrl").value = item.url;
+      document.getElementById("siteCategory").value = item.category;
+      document.getElementById("siteDesc").value = item.description || "";
+      document.getElementById("editModal").classList.remove("hidden");
+    }
+
+    async function submitSiteForm() {
+      const id = document.getElementById("editSiteId").value;
+      const title = document.getElementById("siteTitle").value.trim();
+      const url = document.getElementById("siteUrl").value.trim();
+      const category = document.getElementById("siteCategory").value;
+      const description = document.getElementById("siteDesc").value.trim();
+
+      if (!title || !url) return alert("請輸入網站名稱與網址！");
+
+      closeModal();
+      document.getElementById("loading").classList.remove("hidden");
+
+      const action = id ? "updateSite" : "addSite";
+      try {
+        const res = await sendPost(action, {
+          id: id,
+          title: title,
+          url: url,
+          category: category,
+          description: description
+        });
+        if (res.status === "success") {
+          alert(res.message);
+          loadAllData();
+        } else {
+          alert("操作失敗：" + res.message);
+        }
+      } catch (err) {
+        alert("連線失敗！");
+      } finally {
+        document.getElementById("loading").classList.add("hidden");
+      }
+    }
+
+    async function deleteSite(id, event) {
+      event.stopPropagation();
+      if (!confirm("確定要刪除這筆教學資源嗎？")) return;
+
+      document.getElementById("loading").classList.remove("hidden");
+      try {
+        const res = await sendPost("deleteSite", { id: id });
+        if (res.status === "success") {
+          alert(res.message);
+          loadAllData();
+        } else {
+          alert("刪除失敗：" + res.message);
+        }
+      } catch (err) {
+        alert("刪除失敗！");
+      } finally {
+        document.getElementById("loading").classList.add("hidden");
+      }
+    }
+
+    function setFilter(catName) {
+      currentFilter = catName;
+      renderCategoryFilter();
+      renderCards();
+    }
+  </script>
+</body>
+</html>
