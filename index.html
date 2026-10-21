@@ -8,7 +8,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SortableJS 拖曳庫 -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-  <!-- Google Fonts: Noto Sans TC -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -89,13 +88,12 @@
   <div id="loginModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
       <h3 class="text-base font-bold text-gray-800 mb-1">管理員登入</h3>
-      <p class="text-xs text-gray-500 mb-4">輸入 GAS 設定的專用密碼以解鎖增修、分類與自由挪移功能。</p>
+      <p class="text-xs text-gray-500 mb-4">輸入密碼解鎖增修、分類與排版挪移功能。</p>
       <input type="password" id="passwordInput" placeholder="請輸入管理密碼" 
-             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4285F4]"
-             onkeydown="if(event.key === 'Enter') verifyPassword()">
+             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
       <div class="flex justify-end space-x-2">
         <button onclick="toggleAuthModal()" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-        <button id="loginSubmitBtn" onclick="verifyPassword()" class="px-4 py-2 text-xs font-medium text-white bg-[#4285F4] hover:bg-blue-600 rounded-lg">確認登入</button>
+        <button onclick="verifyPassword()" class="px-4 py-2 text-xs font-medium text-white bg-[#4285F4] hover:bg-blue-600 rounded-lg">確認登入</button>
       </div>
     </div>
   </div>
@@ -167,7 +165,7 @@
     // ============================================================
     // ⚠️ 請務必將此網址替換為您的 GAS Web 應用程式網址！
     // ============================================================
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbywQ0iY35Yq_YOUR_DEPLOYMENT_ID/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/YOUR_ACTUAL_SCRIPT_ID/exec";
 
     let siteList = [];
     let categoryList = [];
@@ -209,7 +207,7 @@
       }
     }
 
-    // 2. 類別標籤渲染
+    // 2. 類別渲染
     function renderCategoryFilter() {
       const bar = document.getElementById("categoryFilterBar");
       bar.innerHTML = "";
@@ -297,7 +295,7 @@
       initSortable();
     }
 
-    // 4. 拖曳排版設定
+    // 4. 拖曳排版
     function initSortable() {
       const container = document.getElementById("gridContainer");
       if (sortableInstance) sortableInstance.destroy();
@@ -354,7 +352,7 @@
       }
     }
 
-    // 5. 類別管理操作
+    // 5. 類別管理
     function openCatModal() {
       renderCatList();
       document.getElementById("catModal").classList.remove("hidden");
@@ -425,7 +423,7 @@
       }
     }
 
-    // 6. 管理員登入與真實連線驗證（防假登入核心）
+    // 6. 登入切換
     function toggleAuthModal() {
       if (adminToken) {
         if (confirm("是否登出管理員身分？")) {
@@ -436,48 +434,18 @@
         }
       } else {
         document.getElementById("loginModal").classList.toggle("hidden");
-        document.getElementById("passwordInput").focus();
       }
     }
 
-    async function verifyPassword() {
+    function verifyPassword() {
       const pwd = document.getElementById("passwordInput").value.trim();
       if (!pwd) return alert("請輸入密碼！");
-
-      const submitBtn = document.getElementById("loginSubmitBtn");
-      submitBtn.textContent = "驗證中...";
-      submitBtn.disabled = true;
-
-      try {
-        // 向 GAS 後端發送真實身分驗證請求
-        const res = await fetch(GAS_API_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            action: "verifyAuth",
-            password: pwd
-          })
-        });
-        const result = await res.json();
-
-        if (result.status === "success") {
-          adminToken = pwd;
-          sessionStorage.setItem("adminPassword", pwd);
-          document.getElementById("loginModal").classList.add("hidden");
-          document.getElementById("passwordInput").value = "";
-          updateAdminUI();
-          renderCards();
-        } else {
-          alert("密碼錯誤！請重新確認。");
-          document.getElementById("passwordInput").value = "";
-          document.getElementById("passwordInput").focus();
-        }
-      } catch (err) {
-        console.error(err);
-        alert("無法連線後端進行驗證，請確認網路或 GAS 部署狀態。");
-      } finally {
-        submitBtn.textContent = "確認登入";
-        submitBtn.disabled = false;
-      }
+      adminToken = pwd;
+      sessionStorage.setItem("adminPassword", pwd);
+      document.getElementById("loginModal").classList.add("hidden");
+      document.getElementById("passwordInput").value = "";
+      updateAdminUI();
+      renderCards();
     }
 
     function updateAdminUI() {
@@ -502,7 +470,7 @@
       }
     }
 
-    // 7. 網站增修刪操作
+    // 7. 網站增修刪
     function openModal(mode) {
       document.getElementById("editModal").classList.remove("hidden");
       if (mode === "add") {
